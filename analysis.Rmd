@@ -22,8 +22,15 @@ raw <- read_tsv("data_w_themes.csv")
 # grouping media types
 raw <- raw %>% 
   mutate(media_type_name = ifelse(media_type_name == 'Regional avis', 'Avis', 
-                                  ifelse(media_type_name == 'Onlinemedie uden citat', 'Blog', paste0(media_type_name)))
+                                  ifelse(media_type_name == 'Onlinemedie uden citat', 'Blog', paste0(media_type_name))),
+         rev_gender_updated = ifelse(rev_gender_updated == 'female', 'Woman', 'Man'),
+         author_gender = ifelse(author_gender == 'female', 'Woman', 'Man')
          )
+
+# relevel genders so woman is baseline 
+raw$author_gender <- factor(raw$author_gender, levels=c('Woman', 'Man'))
+raw$rev_gender_updated <- factor(raw$rev_gender_updated, levels=c('Woman', 'Man'))
+
 
 # find media names with 3 or more reviews
 media_name_count <- raw %>% 
@@ -32,14 +39,12 @@ media_name_count <- raw %>%
   summarise(n = n()) %>% 
   filter(n > 2)
 
-# select relevant columns, retain only blogs and newspapers, and medias with more than 3 reviews, then remove NAs
+# select relevant columns, retain only blogs and newspapers, and medias with more than 3 reviews. Then remove NAs
 df <- raw %>% 
   select(title_id, rev_gender_updated, author_gender, media_name, media_type_name, author_entity_ids_c, grades) %>% 
   filter(media_type_name == 'Blog' | media_type_name == 'Avis') %>% 
   filter(media_name %in% media_name_count$media_name) %>% 
-  mutate(grades_factor = as.factor(grades),
-         rev_gender_updated = str_to_title(rev_gender_updated),
-         author_gender = str_to_title(author_gender)) %>% 
+  mutate(grades_factor = as.factor(grades))%>% 
   drop_na()
 ```
 
@@ -48,9 +53,6 @@ df <- raw %>%
 
 ## Ordinal control analysis, cumulative linear mixed effects model
 ```{r}
-df <- df %>% 
-  mutate(grades_factor = as.factor(grades))
-
 m0 <- ordinal::clmm(grades_factor ~ 1 + (1 | media_name) + (1| author_entity_ids_c )+ (1 |  title_id), data = df)
 
 m1 <- ordinal::clmm(grades_factor ~ media_type_name 
@@ -67,9 +69,9 @@ anova(m0, m1, m2, m3, m4)
 ```
 
 ```{r}
-summary(m4)
+# summary(m4)
 
-palette <- c("#AEC5EB", "#904E55", "#243010")
+palette <- c("#904E55","#243010","#AEC5EB" )
 
 ggplot(df, aes(x = grades,  group = author_gender))+
   geom_bar(aes(y = after_stat(prop), fill = author_gender), position = 'dodge', stat = 'count', color = 'black')+
@@ -128,7 +130,7 @@ ggsave('gender_model_results.png', height = 3000, width = 4500, units = 'px', dp
 ```{r}
 # make pretty plot
 df <- df %>% 
-  mutate(rev_gender_dummy = ifelse(rev_gender_updated == 'female', 0, 1))
+  mutate(rev_gender_dummy = ifelse(rev_gender_updated == 'Woman', 0, 1))
 
 
 lm4 <- lmerTest::lmer(grades ~ media_type_name + rev_gender_dummy + author_gender + rev_gender_dummy:author_gender
@@ -154,7 +156,7 @@ df <- raw %>%
 category_subset <- df %>% 
   filter(category %in% c('Romantisk skønlitteratur', 'Internationale klassikere', 'Skønlitteratur: generelt'))
 
-# reorder so fiction, general becomes baseline
+# reorder so fiction: general becomes baseline
 category_subset$category <- factor(category_subset$category, levels=c('Skønlitteratur: generelt', 'Internationale klassikere', 'Romantisk skønlitteratur'))
 
 ```
@@ -208,7 +210,7 @@ ggsave('category_model_results.png', height = 3000, width = 4500, units = 'px', 
 ```
 ```{r}
 category_subset <- category_subset %>% 
-  mutate(rev_gender_dummy = ifelse(rev_gender_updated == 'female', 0, 1))
+  mutate(rev_gender_dummy = ifelse(rev_gender_updated == 'Woman', 0, 1))
 
 
 lm4 <- lmerTest::lmer(grades ~ media_type_name + rev_gender_dummy + category + rev_gender_dummy:category

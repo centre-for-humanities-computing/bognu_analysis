@@ -19,6 +19,8 @@ raw <- read_tsv("data_w_themes.csv")
 
 ## cleaning data
 ```{r}
+
+
 # grouping media types
 raw <- raw %>% 
   mutate(media_type_name = ifelse(media_type_name == 'Regional avis', 'Avis', 
@@ -30,6 +32,8 @@ raw <- raw %>%
 # relevel genders so woman is baseline 
 raw$author_gender <- factor(raw$author_gender, levels=c('Woman', 'Man'))
 raw$rev_gender_updated <- factor(raw$rev_gender_updated, levels=c('Woman', 'Man'))
+
+n_distinct(raw$media_name)
 
 
 # find media names with 3 or more reviews
@@ -44,8 +48,12 @@ df <- raw %>%
   select(title_id, rev_gender_updated, author_gender, media_name, media_type_name, author_entity_ids_c, grades) %>% 
   filter(media_type_name == 'Blog' | media_type_name == 'Avis') %>% 
   filter(media_name %in% media_name_count$media_name) %>% 
-  mutate(grades_factor = as.factor(grades))%>% 
+  mutate(grades_factor = as.factor(grades),
+         grades_scaled = scale(grades))%>% 
   drop_na()
+
+
+n_distinct(df$title_id)
 ```
 
 
@@ -69,7 +77,7 @@ anova(m0, m1, m2, m3, m4)
 ```
 
 ```{r}
-# summary(m4)
+summary(m4)
 
 palette <- c("#904E55","#243010","#AEC5EB" )
 
@@ -105,13 +113,15 @@ lm2 <- lmerTest::lmer(grades ~ media_type_name + rev_gender_updated
 lm3 <- lmerTest::lmer(grades ~ media_type_name + rev_gender_updated + author_gender 
                       + (1 | media_name) + (1 | author_entity_ids_c / title_id), data = df)
 lm4 <- lmerTest::lmer(grades ~ media_type_name + rev_gender_updated + author_gender + rev_gender_updated:author_gender
-                     + (1 | media_name) + (1 | author_entity_ids_c / title_id), data = df)
+                     + (1 | media_name) + (1 | author_entity_ids_c ) + ( 1| title_id), data = df)
 
 anova(lm0, lm1, lm2, lm3, lm4)
 ```
 
 
 ```{r}
+plot(lm4)
+
 vif(lm4)
 
 summary(lm4)
@@ -142,14 +152,13 @@ interact_plot(model = lm4, pred = rev_gender_dummy, modx = author_gender, interv
 
 # Genre analysis
 ```{r}
-# clean data 
+# select relevant columns, retain only blogs and newspapers, and medias with more than 3 reviews. Then remove NAs
 df <- raw %>% 
-  select(title_id, rev_gender_updated, author_gender, 
-         media_name, media_type_name, author_entity_ids_c, 
-         grades, category) %>% 
+  select(title_id, rev_gender_updated, author_gender, media_name, media_type_name, author_entity_ids_c, grades, category) %>% 
   filter(media_type_name == 'Blog' | media_type_name == 'Avis') %>% 
   filter(media_name %in% media_name_count$media_name) %>% 
-  mutate(grades_factor = as.factor(grades)) %>% 
+  mutate(grades_factor = as.factor(grades),
+         grades_scaled = scale(grades))%>% 
   drop_na()
 
 # select interesting genres
@@ -159,6 +168,8 @@ category_subset <- df %>%
 # reorder so fiction: general becomes baseline
 category_subset$category <- factor(category_subset$category, levels=c('Skønlitteratur: generelt', 'Internationale klassikere', 'Romantisk skønlitteratur'))
 
+
+n_distinct(category_subset$media_name)
 ```
 
 
@@ -186,13 +197,13 @@ anova(m0, m1, m2, m3, m4)
 lm0 <- lmerTest::lmer(grades ~ 1 + (1 | media_name) + (1 | author_entity_ids_c / title_id), data = category_subset)
 
 lm1 <- lmerTest::lmer(grades ~ media_type_name 
-                    + (1 | media_name) + (1 | author_entity_ids_c / title_id), data = category_subset)
+                    + (1 | media_name) + (1 | author_entity_ids_c) + (1 | title_id), data = category_subset)
 lm2 <- lmerTest::lmer(grades ~ media_type_name + rev_gender_updated 
-                    + (1 | media_name) + (1 | author_entity_ids_c / title_id), data = category_subset)
+                    + (1 | media_name) + (1 | author_entity_ids_c) + (1 | title_id), data = category_subset)
 lm3 <- lmerTest::lmer(grades ~ media_type_name + rev_gender_updated + category 
-                    + (1 | media_name) + (1 | author_entity_ids_c / title_id), data = category_subset)
+                    + (1 | media_name) + (1 | author_entity_ids_c) + (1 | title_id), data = category_subset)
 lm4 <- lmerTest::lmer(grades ~ media_type_name + rev_gender_updated + category + rev_gender_updated:category
-                    + (1 | media_name) + (1 | author_entity_ids_c / title_id), data = category_subset)
+                    + (1 | media_name) + (1 | author_entity_ids_c) + (1 | title_id), data = category_subset)
 
 anova(lm0, lm1, lm2, lm3, lm4)
 ```
@@ -219,4 +230,5 @@ lm4 <- lmerTest::lmer(grades ~ media_type_name + rev_gender_dummy + category + r
 interact_plot(model = lm4, pred = rev_gender_dummy, modx = category, interval = T,
               x.label = 'Reviewer Gender', y.label = 'Mean Rating',legend.main = 'Genre', colors = palette)
 ```
+
 

@@ -189,7 +189,7 @@ m4 <- ordinal::clmm(grades_factor ~ media_type_name + rev_gender_updated + categ
 
 anova(m0, m1, m2, m3, m4)
 
-
+summary(m4)
 ```
 
 ## Main analysis
